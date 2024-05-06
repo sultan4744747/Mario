@@ -1,7 +1,6 @@
 #вызов библиотеки pygame и инициализация ее
-import random
-
 import pygame
+import random
 pygame.init ()
 
 #Выставляем широту и длину экрана в переменных
@@ -24,9 +23,9 @@ font_small = pygame.font.Font(font_path, 24)
 
 game_over = False
 # поверхности которые будут появлять при проигрыше и расположение его на экране
-retry_text = font_small.render ('PRESS ANY KEY', True, (255, 255, 255))
+retry_text = font_small.render('PRESS ANY KEY', True, (255, 255, 255))
 retry_rect = retry_text.get_rect()
-retry_text = (W//2,H//2)
+retry_rect.midtop = (W//2,H//2)
 
 #добавление файла земли а так же редактирование его в нужные размеры
 ground_image = pygame.image.load('Снимок экрана 2024-05-04 в 17.27.10.png')
@@ -41,12 +40,12 @@ enemy = pygame.transform.scale(enemy,(80,80))
 
 #добавление файла мертвого гумбы а так же редактирование его в нужные размеры
 enemy_image = pygame.image.load('goomba_mini.png')
-enemy_image = pygame.transform.scale(enemy_image,(90,90))
+enemy_image = pygame.transform.scale(enemy_image,(80,80))
 
 
 #добавление файла mario а так же редактирование его в нужные размеры
 player_image = pygame.image.load('images1.png')
-player_image = pygame.transform.scale(player_image,(80,80))
+player_image = pygame.transform.scale(player_image,(80,60))
 
 
 
@@ -115,7 +114,7 @@ class Entity:
 class Player(Entity):
     def __init__(self):
         super().__init__(player_image) #передаем загруженную картинку игрока
-
+        self.respawn()
     #функция для влияния скорости игрока
     def handle_input(self):
         self.x_speed = 0
@@ -159,7 +158,7 @@ class Goomba(Entity):
         if direction == 0:
             self.x_speed = self.speed
             self.rect.bottomright = (0,0)
-        else:
+        if direction == 1:
             self.x_speed = -self.speed
             self.rect.bottomleft(W,0)
 
@@ -168,7 +167,7 @@ class Goomba(Entity):
         super().update()
 
         #проверка на то что ушли ли гумбы в правую или левую часть экрана
-        if self.x_speed > 0 and self.rect.left > W or self.x_speed <0 and self.rect.right <0:
+        if self.x_speed > 0 and self.rect.left > W or self.x_speed <0 and self.rect.rect.right <0:
             self.is_out = True
 
 
@@ -186,16 +185,22 @@ spawn_delay = INIT_DELAY
 #переменная которая нужна для того чтобы усложнять игру или сокрощать время спавна гумб
 DECREASE_BASE = 1.01
 #переменная для того чтобы знать время последнего спавно
-last_spawn_time  = pygame.time.get_ticks()
+the_last_spawn_time  = pygame.time.get_ticks()
 
 #игровой цыкл
 running = True
 while running:
     #перебираю события закрытия окна
-    for e in pygame.event.get():
+    for e in pygame.event.get ( ) :
         if e.type == pygame. QUIT:
             running = False
-
+        elif e.type == pygame.KEYDOWN:
+            if player.is_out:
+                score =0
+                spawn_delay = INIT_DELAY
+                the_last_spawn_time = pygame.time.get_ticks()
+                player.respawn()
+                goombas.clear()
     #ограничиваю игру по кадрам в секунду
     clock.tick(FPS)
 
@@ -211,34 +216,42 @@ while running:
     # проверка на то что вылетил ли марио за границы
     if player.is_out:
         score_rect.midbottom = (W//2,H//2)
-        screen.blit(retry_rect, retry_text)
+        screen.blit(retry_text,retry_rect)
     else:
 
-        #добавление сущности
+        # добавление сущности
         player.update()
         player.draw(screen)
-
-        #текущее игровое время
-        now = pygame.time.get_ticks()
+        # текущее игровое время
+        now_time = pygame.time.get_ticks()
         # время которое прошло с моента предидущего спавна
-        elapsed = now - last_spawn_time
+        elapsed = now_time - the_last_spawn_time
+        # добавление сущности
 
         # проверка на то что прошло ли время  с момента предидущего спавно
         if elapsed >spawn_delay:
-            last_spawn_time = now
+            the_last_spawn_time = now_time
             goombas.append(Goomba())
 
-        #редактирование гумб(удалять тех кто ушел за поле )
+        # редактирование гумб(удалять тех кто ушел за поле )
         for goomba in list(goombas):
             if goomba.is_out:
                 goombas.remove(goomba)
             else:
                 goomba.update()
                 goomba.draw(screen)
+            if not player.is_dead and not goomba.is_dead and player.rect.colliderect(goomba.rect):
+                if player.rect.bottom - player.y_speed < goomba.rect.top:
+                    goomba.kill(enemy_image)
+                    player.jump()
+                    score+=1
+                    spawn_delay = INIT_DELAY/(DECREASE_BASE ** score)
+                else:
+                    player.kill(player_image)
 
 
         #расположение счетчика
-        score_rect.midtop = (W//2,5)
+        score_rect.midtop = (W//2,H//5)
     #выставили счет очков в игре
     screen.blit(score_text,score_rect)
     pygame.display.flip()#обновил экран для того чтоб все отоброжалось
